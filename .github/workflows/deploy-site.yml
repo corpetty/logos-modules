@@ -1,0 +1,60 @@
+name: Deploy site
+
+# Regenerates and publishes modules.hackyguru.com (GitHub Pages) from the
+# catalog's index.json. Runs after every "Rebuild index" so the page always
+# reflects what clients can actually install, and on pushes that touch the
+# site or catalog metadata.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "logos-repo.json"
+      - "modules.txt"
+  workflow_run:
+    workflows: ["Rebuild index"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true # module icons are read from the submodule checkout
+
+      - name: Fetch index.json
+        run: |
+          set -euo pipefail
+          url="$(python3 -c "import json; print(json.load(open('logos-repo.json'))['indexUrl'])")"
+          curl -fsSL "$url" -o index.json || echo '{"packages":[]}' > index.json
+
+      - name: Generate site
+        run: |
+          python3 site/gen_site.py --index index.json --out _site
+          cp logos-repo.json _site/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
