@@ -1,7 +1,0 @@
-# Module paths released by this catalog — one per line, relative to the
-# repo root. Read by release-all.yml's discover step (this catalog's
-# modules live in SUBDIRECTORIES of the logos-workshop submodule, so the
-# template's plain .gitmodules discovery doesn't apply).
-# Lines starting with # are ignored.
-submodules/logos-workshop/logos-wallet/logos-wallet-core
-submodules/logos-workshop/logos-wallet/logos-wallet-ui
