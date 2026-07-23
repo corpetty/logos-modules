@@ -16,3 +16,6 @@
 ; After cloning a fork, materialise the submodule working trees with:
 ;
 ;   git submodule update --init --recursive
+[submodule "submodules/logos-workshop"]
+	path = submodules/logos-workshop
+	url = https://github.com/hackyguru/logos-workshop

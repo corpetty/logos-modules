@@ -37,9 +37,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Every `path = submodules/<repo>` entry in .gitmodules.
-          paths="$(git config --file .gitmodules --get-regexp 'submodule\..*\.path$' 2>/dev/null \
-                   | awk '{print $2}' | sort -u || true)"
+          # This catalog's modules live in subdirectories of the
+          # logos-workshop submodule, so the module list comes from
+          # modules.txt (one path per line, # comments) instead of the
+          # template's plain .gitmodules scan — which is kept as a
+          # fallback for any future root-level module submodules.
+          if [ -f modules.txt ]; then
+            paths="$(grep -v '^\s*#' modules.txt | grep -v '^\s*$' | sort -u || true)"
+          else
+            paths="$(git config --file .gitmodules --get-regexp 'submodule\..*\.path$' 2>/dev/null \
+                     | awk '{print $2}' | sort -u || true)"
+          fi
           if [ -z "${paths}" ]; then
             echo 'matrix={"module_path":[]}' >> "$GITHUB_OUTPUT"
             echo 'count=0' >> "$GITHUB_OUTPUT"
