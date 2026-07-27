@@ -7,8 +7,11 @@ deploy-site workflow after every index rebuild; runnable locally too:
 
     curl -fsSL $(python3 -c "import json;print(json.load(open('logos-repo.json'))['indexUrl'])") -o /tmp/index.json
     python3 site/gen_site.py --index /tmp/index.json --out _site
+
+Styling mirrors hackyguru.com — #121212 background, Inter body, mono
+headings with `//` markers, translucent white/5 cards with white/10 borders.
 """
-import argparse, base64, glob, html, json, os
+import argparse, base64, glob, html, json, os, shutil
 
 REPO_GH = "https://github.com/hackyguru/logos-modules"
 SOURCE_GH = "https://github.com/hackyguru/logos-workshop"
@@ -85,19 +88,20 @@ def render_app(members: list) -> str:
 
     icon_html = (
         f'<img class="icon" src="{icon}" alt="">' if icon
-        else f'<div class="icon icon-fallback">{html.escape(title[0])}</div>'
-    )
-    pkgs_html = "".join(
-        f'<span class="chip mono">{html.escape(m["name"])}'
-        f'<span class="chip-type">{html.escape(m.get("type", ""))}</span></span>'
-        for m in manifests
+        else f'<div class="icon icon-fallback mono">{html.escape(title[0])}</div>'
     )
     deps_html = (
-        '<div class="row"><span class="label">requires</span>'
+        '<div class="row"><span class="label mono">requires</span>'
         + "".join(f'<span class="chip mono">{html.escape(d)}</span>' for d in deps)
         + "</div>"
     ) if deps else ""
     plats_html = "".join(f'<span class="plat mono">{html.escape(p)}</span>' for p in plats)
+
+    dl_html = "".join(
+        f'<a class="btn btn-sm" href="{html.escape(v["url"])}" title="{html.escape(os.path.basename(v["url"]))}">'
+        f'download{"" if len(vers) == 1 else (" ui" if m.get("type") == "ui_qml" else " core")} ⤓</a>'
+        for m, v in zip(manifests, vers) if v.get("url")
+    )
 
     return f"""
     <article class="card">
@@ -109,11 +113,13 @@ def render_app(members: list) -> str:
         </div>
       </div>
       <p class="desc">{html.escape(desc)}</p>
-      <div class="row"><span class="label">packages</span>{pkgs_html}</div>
       {deps_html}
       <div class="card-foot">
         <div class="plats">{plats_html}</div>
-        <a class="src mono" href="{SOURCE_GH}" target="_blank" rel="noopener">source ↗</a>
+        <div class="actions">
+          <a class="src mono" href="{SOURCE_GH}" target="_blank" rel="noopener">source ↗</a>
+          {dl_html}
+        </div>
       </div>
     </article>"""
 
@@ -138,97 +144,281 @@ def main():
     repo_url = f"{repo['homepage']}/logos-repo.json"
     generated = html.escape(index.get("generatedAt", ""))
 
+    site_url = repo["homepage"]
+    title = repo.get("displayName", "Guru's Logos Modules")
+    description = repo["description"]
+    og_image = f"{site_url}/basecamp.png"
+    site_ld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": title,
+        "url": site_url,
+        "description": description,
+        "author": {
+            "@type": "Person",
+            "name": "Kumaraguru",
+            "alternateName": "Guru",
+            "url": "https://hackyguru.com",
+        },
+    })
+
     page = f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Guru's Logos Modules</title>
-<meta name="description" content="{html.escape(repo['description'])}">
+<title>{html.escape(title)}</title>
+<meta name="description" content="{html.escape(description)}">
+<meta name="author" content="Kumaraguru">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#121212">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="canonical" href="{site_url}">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{html.escape(title)}">
+<meta property="og:title" content="{html.escape(title)}">
+<meta property="og:description" content="{html.escape(description)}">
+<meta property="og:url" content="{site_url}">
+<meta property="og:image" content="{og_image}">
+<meta property="og:image:width" content="1600">
+<meta property="og:image:height" content="1054">
+<meta property="og:locale" content="en_US">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@hackyguru">
+<meta name="twitter:creator" content="@hackyguru">
+<meta property="twitter:domain" content="modules.hackyguru.com">
+<meta property="twitter:url" content="{site_url}">
+<meta name="twitter:title" content="{html.escape(title)}">
+<meta name="twitter:description" content="{html.escape(description)}">
+<meta name="twitter:image" content="{og_image}">
+
+<script type="application/ld+json">{site_ld}</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
 <style>
   :root {{
-    --bg: #121212; --card: #17171a; --border: #27272a;
-    --fg: #f4f4f5; --dim: #a1a1aa; --dimmer: #71717a;
+    --bg: #121212;
+    --fg: #f4f4f5;            /* zinc-100 */
+    --text: #a1a1aa;          /* zinc-400 */
+    --dim: #9ca3af;           /* gray-400 */
+    --dimmer: #71717a;        /* zinc-500 */
+    --card: rgba(255, 255, 255, 0.05);
+    --card-hover: rgba(255, 255, 255, 0.10);
+    --border: rgba(255, 255, 255, 0.10);
+    --border-hover: rgba(255, 255, 255, 0.20);
   }}
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
   body {{
-    background: var(--bg); color: var(--fg);
-    font-family: Inter, -apple-system, "Segoe UI", sans-serif;
-    -webkit-font-smoothing: antialiased; line-height: 1.6;
+    background: var(--bg); color: var(--text);
+    font-family: "Inter", -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.6;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
   }}
   .mono {{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }}
-  main {{ max-width: 880px; margin: 0 auto; padding: 72px 24px 96px; }}
-  header p.kicker {{ color: var(--dimmer); font-size: 13px; letter-spacing: .06em; }}
-  h1 {{ font-size: 34px; font-weight: 700; margin: 8px 0 12px; }}
-  header p.sub {{ color: var(--dim); max-width: 560px; font-size: 15px; }}
-  .add {{
-    margin: 32px 0 56px; border: 1px solid var(--border); border-radius: 10px;
-    background: var(--card); padding: 18px 20px;
+  ::selection {{ background: rgba(255,255,255,.2); }}
+  main {{ max-width: 880px; margin: 0 auto; padding: 112px 24px 96px; }}
+
+  /* title bar — same as hackyguru.com's navbar */
+  .topbar {{
+    position: fixed; top: 0; left: 0; width: 100%; z-index: 50;
+    border-bottom: 1px solid transparent;
+    transition: background .3s ease, border-color .3s ease, backdrop-filter .3s ease;
   }}
-  .add .label {{ display:block; color: var(--dimmer); font-size: 12px; margin-bottom: 10px; letter-spacing:.05em; }}
-  .add .urlrow {{ display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }}
+  .topbar.scrolled {{
+    background: rgba(18, 18, 18, .8);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom-color: rgba(255, 255, 255, .1);
+  }}
+  .topbar nav {{
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px; padding: 0 16px;
+  }}
+  @media (min-width: 768px) {{ .topbar nav {{ padding: 0 32px; }} }}
+  .topbar .avatar img {{ width: 40px; height: 40px; display: block; object-fit: cover; }}
+  .topbar .links {{
+    display: none; align-items: center; gap: 32px;
+    border: 1px solid var(--border); border-radius: 999px;
+    background: var(--card); padding: 8px 24px;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,.2), 0 4px 6px -4px rgba(0,0,0,.2);
+  }}
+  @media (min-width: 768px) {{ .topbar .links {{ display: flex; }} }}
+  .topbar .links a {{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14px; color: var(--text); text-decoration: none;
+  }}
+  .topbar .links a:hover, .topbar .links a.active {{ color: #fff; }}
+  .topbar .menu-btn {{
+    display: block; background: none; border: 0; cursor: pointer;
+    color: #e4e4e7; padding: 4px;
+  }}
+  .topbar .menu-btn:hover {{ color: #fff; }}
+  @media (min-width: 768px) {{ .topbar .menu-btn {{ display: none; }} }}
+  .mobile-menu {{
+    position: fixed; inset: 0; z-index: 40; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 36px; background: var(--bg);
+  }}
+  .mobile-menu.open {{ display: flex; }}
+  .mobile-menu a {{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 30px; color: var(--text); text-decoration: none;
+  }}
+  .mobile-menu a:hover, .mobile-menu a.active {{ color: #fff; }}
+  a {{ color: var(--text); transition: color .15s ease; }}
+  a:hover {{ color: #fff; }}
+
+  h1 {{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: clamp(34px, 6vw, 48px); font-weight: 700; color: var(--fg);
+    margin: 10px 0 16px; cursor: default;
+  }}
+
+  /* section heading — `// label`, as on hackyguru.com */
+  h2 {{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 16px; font-weight: 600; color: var(--fg); margin-bottom: 16px;
+  }}
+  h2 .marker {{ margin-right: 8px; }}
+
+  section {{ margin-top: 48px; }}
+
+  .add {{
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--card); padding: 18px 20px;
+    transition: border-color .15s ease, background .15s ease;
+  }}
+  .add:hover {{ border-color: var(--border-hover); background: var(--card-hover); }}
+  .add .getrow {{ display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }}
+  .add .gettext {{ flex: 1; min-width: 260px; }}
+  .add .getrow p {{ color: var(--dim); font-size: 13.5px; margin-top: 4px; max-width: 520px; }}
+  .add .getrow .btn {{ margin-top: 14px; }}
+  a.btn {{
+    display: inline-block; background: var(--fg); color: #121212; border-radius: 8px;
+    padding: 9px 18px; font-size: 13px; font-weight: 600; text-decoration: none;
+    white-space: nowrap; transition: background .15s ease;
+  }}
+  a.btn:hover {{ background: #fff; color: #121212; }}
+  .add .shot {{
+    display: block; width: 320px; max-width: 100%; flex-shrink: 0;
+    border: 1px solid var(--border); border-radius: 8px;
+  }}
+  .add .urlrow {{
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);
+  }}
   .add code {{
-    font-size: 13px; color: var(--fg); background: #0c0c0e; border: 1px solid var(--border);
-    border-radius: 6px; padding: 8px 12px; overflow-x: auto; flex: 1; min-width: 240px;
+    font-size: 13px; color: var(--fg); background: rgba(0,0,0,.35);
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px;
+    overflow-x: auto; flex: 1; min-width: 240px; white-space: nowrap;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }}
   .add button {{
-    background: var(--fg); color: #121212; border: 0; border-radius: 6px;
-    padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    background: var(--fg); color: #121212; border: 0; border-radius: 8px;
+    padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: background .15s ease;
   }}
-  .add button:hover {{ background: #d4d4d8; }}
+  .add button:hover {{ background: #fff; }}
   .add .hint {{ color: var(--dimmer); font-size: 12.5px; margin-top: 10px; }}
-  h2 {{ font-size: 13px; font-weight: 500; color: var(--dimmer); letter-spacing: .08em; margin-bottom: 18px; }}
+
   .card {{
-    border: 1px solid var(--border); border-radius: 10px; background: var(--card);
-    padding: 22px; margin-bottom: 18px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--card);
+    padding: 20px; margin-bottom: 12px;
+    transition: border-color .15s ease, background .15s ease;
   }}
+  .card:hover {{ border-color: var(--border-hover); background: var(--card-hover); }}
   .card-head {{ display: flex; gap: 14px; align-items: center; margin-bottom: 12px; }}
-  .icon {{ width: 44px; height: 44px; border-radius: 9px; object-fit: contain; background: #0c0c0e; border: 1px solid var(--border); }}
-  .icon-fallback {{ display:flex; align-items:center; justify-content:center; color: var(--dim); font-size: 20px; }}
-  h3 {{ font-size: 17px; font-weight: 600; }}
+  .icon {{
+    width: 44px; height: 44px; border-radius: 10px; object-fit: contain;
+    background: rgba(255,255,255,.05); border: 1px solid var(--border); flex-shrink: 0;
+  }}
+  .icon-fallback {{ display: flex; align-items: center; justify-content: center; color: var(--dim); font-size: 20px; }}
+  h3 {{ font-size: 15px; font-weight: 600; color: #f3f4f6; transition: color .15s ease; }}
+  .card:hover h3 {{ color: #fff; }}
   .ver {{ color: var(--dimmer); font-size: 12.5px; font-weight: 400; margin-left: 4px; }}
   .meta {{ color: var(--dimmer); font-size: 12px; }}
-  .desc {{ color: var(--dim); font-size: 14.5px; margin-bottom: 14px; }}
+  .desc {{ color: var(--dim); font-size: 13.5px; line-height: 1.6; margin-bottom: 14px; }}
   .row {{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }}
   .label {{ color: var(--dimmer); font-size: 12px; min-width: 64px; }}
   .chip {{
-    font-size: 12px; color: var(--fg); border: 1px solid var(--border);
-    border-radius: 999px; padding: 2px 10px; background: #0c0c0e;
+    font-size: 12px; color: #f3f4f6; border: 1px solid var(--border);
+    border-radius: 999px; padding: 2px 10px; background: rgba(255,255,255,.05);
   }}
   .chip-type {{ color: var(--dimmer); margin-left: 6px; }}
-  .card-foot {{ display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }}
+  .card-foot {{ display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }}
+  .card-foot .actions {{ display: flex; align-items: center; gap: 14px; }}
+  a.btn-sm {{ padding: 6px 14px; font-size: 12px; }}
   .plats {{ display: flex; gap: 6px; flex-wrap: wrap; }}
-  .plat {{ font-size: 11.5px; color: var(--dimmer); border: 1px dashed var(--border); border-radius: 4px; padding: 1px 7px; }}
+  .plat {{
+    font-size: 11.5px; color: var(--dimmer); border: 1px dashed var(--border);
+    border-radius: 6px; padding: 1px 7px;
+  }}
   a.src {{ color: var(--dim); font-size: 12.5px; text-decoration: none; }}
-  a.src:hover {{ color: var(--fg); }}
+  a.src:hover {{ color: #fff; }}
   .empty {{ color: var(--dimmer); font-size: 14px; }}
-  footer {{ margin-top: 64px; color: var(--dimmer); font-size: 12.5px; }}
+
+  footer {{ margin-top: 72px; color: var(--dimmer); font-size: 12.5px; }}
   footer a {{ color: var(--dim); text-decoration: none; }}
-  footer a:hover {{ color: var(--fg); }}
+  footer a:hover {{ color: #fff; }}
 </style>
 </head>
 <body>
+<div class="topbar" id="topbar">
+  <nav>
+    <a class="avatar" href="https://hackyguru.com" aria-label="Guru">
+      <img src="head.gif" alt="Guru">
+    </a>
+    <div class="links">
+      <a href="https://hackyguru.com/#about">about</a>
+      <a href="https://hackyguru.com/articles">articles</a>
+      <a href="https://hackyguru.com/talks">talks</a>
+      <a href="https://hackyguru.com/awards">awards</a>
+    </div>
+    <button class="menu-btn" id="menu-btn" aria-label="Toggle menu">
+      <svg id="icon-open" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+      <svg id="icon-close" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+  </nav>
+</div>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="https://hackyguru.com/#about">about</a>
+  <a href="https://hackyguru.com/articles">articles</a>
+  <a href="https://hackyguru.com/talks">talks</a>
+  <a href="https://hackyguru.com/awards">awards</a>
+</div>
 <main>
   <header>
-    <p class="kicker mono">modules.hackyguru.com</p>
-    <h1>Guru's Logos Modules</h1>
-    <p class="sub">Sovereign apps for <a href="https://logos.co" style="color:var(--fg)">Logos Basecamp</a>,
-    built by <a href="https://hackyguru.com" style="color:var(--fg)">Guru</a>.
-    Add the catalog once — install and update everything below with one click.</p>
+    <h1 id="title">guru's logos modules</h1>
   </header>
 
-  <div class="add">
-    <span class="label mono">BASECAMP → PACKAGE MANAGER → ADD REPOSITORY</span>
-    <div class="urlrow">
-      <code id="repo-url">{html.escape(repo_url)}</code>
-      <button onclick="navigator.clipboard.writeText(document.getElementById('repo-url').textContent).then(()=>{{this.textContent='copied';setTimeout(()=>this.textContent='copy',1500)}})">copy</button>
+  <section>
+    <h2><span class="marker">//</span>get basecamp</h2>
+    <div class="add">
+      <div class="getrow">
+        <div class="gettext">
+          <h3>New here? Download Logos Basecamp first</h3>
+          <p>Basecamp is the desktop app these modules run in — node, wallet and
+          package manager in a single install for macOS and Linux.</p>
+          <a class="btn" href="https://logos.co/basecamp" target="_blank" rel="noopener">download ↗</a>
+        </div>
+        <img class="shot" src="basecamp.png" alt="Logos Basecamp running the Logos Wallet module" loading="lazy">
+      </div>
+      <div class="urlrow">
+        <code id="repo-url">{html.escape(repo_url)}</code>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('repo-url').textContent).then(()=>{{this.textContent='copied';setTimeout(()=>this.textContent='copy',1500)}})">copy</button>
+      </div>
+      <p class="hint">Basecamp → Package Manager → Add repository. Versions and dependencies resolve automatically; packages are Ed25519-signed.</p>
     </div>
-    <p class="hint">Basecamp resolves versions and dependencies for you. Packages are Ed25519-signed.</p>
-  </div>
+  </section>
 
-  <h2 class="mono">MODULES</h2>
-  {cards}
+  <section>
+    <h2><span class="marker">//</span>modules</h2>
+    {cards}
+  </section>
 
   <footer>
     <span class="mono">index generated {generated}</span> ·
@@ -236,12 +426,66 @@ def main():
     <a href="{repo['homepage']}/logos-repo.json">logos-repo.json</a>
   </footer>
 </main>
+<script>
+  // Scramble-on-hover for the title, mirroring hackyguru.com's heading.
+  (function () {{
+    var el = document.getElementById("title");
+    var text = el.textContent, timer = null;
+    function scramble() {{
+      var i = 0;
+      clearInterval(timer);
+      timer = setInterval(function () {{
+        el.textContent = text
+          .split("")
+          .map(function (ch, j) {{
+            if (ch === " " || j < i) return ch;
+            return String.fromCharCode(65 + Math.floor(Math.random() * 60));
+          }})
+          .join("");
+        i += 1;
+        if (i > text.length) {{ clearInterval(timer); el.textContent = text; }}
+      }}, 30);
+    }}
+    el.addEventListener("mouseover", scramble);
+    scramble();
+  }})();
+
+  // Title bar: blur + border once scrolled, as on hackyguru.com.
+  (function () {{
+    var bar = document.getElementById("topbar");
+    function onScroll() {{ bar.classList.toggle("scrolled", window.scrollY > 20); }}
+    window.addEventListener("scroll", onScroll);
+    onScroll();
+  }})();
+
+  // Mobile menu — full-screen overlay with scroll lock.
+  (function () {{
+    var btn = document.getElementById("menu-btn");
+    var menu = document.getElementById("mobile-menu");
+    var iconOpen = document.getElementById("icon-open");
+    var iconClose = document.getElementById("icon-close");
+    function setOpen(open) {{
+      menu.classList.toggle("open", open);
+      iconOpen.style.display = open ? "none" : "";
+      iconClose.style.display = open ? "" : "none";
+      document.body.style.overflow = open ? "hidden" : "";
+    }}
+    btn.addEventListener("click", function () {{ setOpen(!menu.classList.contains("open")); }});
+    menu.addEventListener("click", function (e) {{ if (e.target.tagName === "A") setOpen(false); }});
+  }})();
+</script>
 </body>
 </html>"""
 
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "index.html"), "w") as f:
         f.write(page)
+    # static assets served next to index.html (too big to inline)
+    here = os.path.dirname(os.path.abspath(__file__))
+    for asset in ("head.gif", "basecamp.png", "favicon.ico"):
+        src = os.path.join(here, asset)
+        if os.path.exists(src):
+            shutil.copy(src, args.out)
     print(f"wrote {args.out}/index.html — {len(apps)} app(s), {len(index.get('packages', []))} package(s)")
 
 
