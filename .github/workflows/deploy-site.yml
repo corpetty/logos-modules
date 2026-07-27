@@ -44,6 +44,7 @@ jobs:
         run: |
           python3 site/gen_site.py --index index.json --out _site
           cp logos-repo.json _site/
+          cp CNAME _site/ 2>/dev/null || true
 
       - uses: actions/upload-pages-artifact@v3
         with:
