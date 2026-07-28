@@ -31,11 +31,17 @@ def platforms(manifest: dict) -> list:
 
 
 def find_icon(icon_name: str):
-    """Base64 data-URI for a module icon, searched in the checked-out submodules."""
+    """Base64 data-URI for a module icon.
+
+    Searched in the checked-out submodules first, then in site/icons/ —
+    externally published modules (external-modules.txt) have no submodule
+    here, so their icon is vendored under site/icons/ instead."""
     if not icon_name:
         return None
     base = os.path.basename(icon_name)
-    for p in glob.glob(f"submodules/**/{base}", recursive=True):
+    candidates = glob.glob(f"submodules/**/{base}", recursive=True) \
+        + glob.glob(f"site/icons/{base}")
+    for p in candidates:
         try:
             b = open(p, "rb").read()
         except OSError:

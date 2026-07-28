@@ -20,6 +20,11 @@ versions and dependencies for you.
 | Module | Packages | Description |
 | ------ | -------- | ----------- |
 | **Logos Wallet** | `logos_wallet` (core), `logos_wallet_ui` | Unified Bedrock (base chain) + LEZ (execution zone) wallet — node lifecycle, base transfers/inscriptions, and private LEZ payments. |
+| **Lotion** | `lotion` (core), `lotion_ui` | Local-first, Notion-style writing workspace — SQLite pages with AES-256-GCM envelope crypto, optionally published to logos-storage. |
+
+`lotion_ui` additionally depends on `storage_module`, which this catalog
+does not publish — add a repository that carries it (or install it
+first) or Basecamp's dependency resolution will fail.
 
 More coming as they're polished — source lives in
 [hackyguru/logos-workshop](https://github.com/hackyguru/logos-workshop).
@@ -33,6 +38,18 @@ GitHub Actions build each module's `.lgx` from its Nix flake
 as a `<module>-v<version>` release, and roll everything into the
 [`index` release](https://github.com/hackyguru/logos-modules/releases/tag/index)
 that clients read.
+
+### Externally published modules
+
+The release pipeline builds one module per **submodule root** — it reads
+`<module_path>/metadata.json` and can't target a subdirectory. A monorepo
+holding several modules therefore publishes its own signed `.lgx` (with
+the same key, so `trustedSigners` still matches), and this catalog folds
+those release assets into the index by URL. The sources are listed in
+[`external-modules.txt`](external-modules.txt); the **Augment index**
+workflow runs after every **Rebuild index** and adds them on top.
+[hackyguru/lotion](https://github.com/hackyguru/lotion) works this way —
+`lotion-core` and `lotion-ui` live side by side in one repo.
 
 Development happens in the
 [logos-workshop](https://github.com/hackyguru/logos-workshop) monorepo;

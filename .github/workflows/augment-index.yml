@@ -1,0 +1,156 @@
+name: Augment index
+
+# Folds externally-published modules into the catalog's index.json.
+#
+# "Rebuild index" (the upstream reusable workflow) builds index.json from
+# THIS repo's releases only, overwriting the `index` release asset each
+# run. This workflow runs after it and adds every package listed in
+# external-modules.txt on top, then re-uploads. That ordering is
+# deliberate and self-healing: a scheduled upstream rebuild wipes the
+# external entries, and this workflow — triggered by that same run —
+# immediately puts them back.
+#
+# It is also standalone-safe: it fetches the published index rather than
+# rebuilding one, so a manual run never loses locally-built packages.
+#
+# The heavy lifting is `index.py add` from logos-co/logos-modules-release-tool
+# (pinned to v1, same as the upstream rebuild workflow): it downloads each
+# .lgx, runs `lgx verify`, and records manifest + signature + sha256, so
+# an externally-hosted package gets an entry byte-identical in shape to a
+# locally-built one — only its `url` points elsewhere.
+
+on:
+  workflow_dispatch: {}
+  workflow_run:
+    workflows: ["Rebuild index"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - "external-modules.txt"
+  schedule:
+    # Offset from the upstream rebuild's '17 */6' so the two don't collide
+    # on a cold start where no workflow_run fires.
+    - cron: '47 */6 * * *'
+
+permissions:
+  contents: write
+
+# One augment at a time per repo; a newer run supersedes an in-flight one
+# because `index.py add` re-reads the published index from scratch.
+concurrency:
+  group: augment-index-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  augment:
+    # On the workflow_run path, only act when the rebuild actually
+    # succeeded — augmenting a failed rebuild's stale index is pointless.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # Collect the .lgx URLs named by external-modules.txt. An entry is
+      # either `owner/repo` (enumerate its releases — new versions are
+      # picked up with no edit here) or a direct URL. Drafts and the
+      # rolling `index` tag are skipped, mirroring the upstream collector.
+      - id: collect
+        name: Collect external `.lgx` URLs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > urls.txt
+          if [[ -f external-modules.txt ]]; then
+            sed 's/#.*//' external-modules.txt | tr -d '\r' | while read -r entry; do
+              entry="$(echo "${entry}" | xargs || true)"   # trim
+              [[ -z "${entry}" ]] && continue
+              if [[ "${entry}" == *"://"* ]]; then
+                echo "${entry}" >> urls.txt
+              else
+                echo "::notice::scanning releases of ${entry}"
+                gh api "repos/${entry}/releases" --paginate \
+                  --jq '
+                    .[]
+                    | select(.draft != true)
+                    | select(.tag_name != "index")
+                    | .assets[]?
+                    | select(.name | endswith(".lgx"))
+                    | .browser_download_url
+                  ' >> urls.txt
+              fi
+            done
+          fi
+          sort -u -o urls.txt urls.txt
+          count="$(wc -l < urls.txt | tr -d ' ')"
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
+          echo "::notice::collected ${count} external .lgx URL(s)"
+
+      - name: Fetch the published index.json
+        if: steps.collect.outputs.count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(python3 -c "import json; print(json.load(open('logos-repo.json'))['indexUrl'])")"
+          # Deliberately NOT tolerant of failure: silently starting from an
+          # empty index would drop every locally-built package.
+          curl -fsSL "$url" -o index.json
+          cp index.json index.json.orig
+
+      # `lgx` is required by index.py (it verifies each package and reads
+      # its manifest/signature). Same install pattern the upstream
+      # rebuild-index workflow uses.
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+        if: steps.collect.outputs.count != '0'
+        with:
+          extra-conf: |
+            experimental-features = nix-command flakes
+      - name: Set up lgx CLI
+        if: steps.collect.outputs.count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix build github:logos-co/logos-package#lgx --out-link "$RUNNER_TEMP/lgx-tool"
+          echo "$RUNNER_TEMP/lgx-tool/bin" >> "$GITHUB_PATH"
+
+      - name: Checkout logos-modules-release-tool (for index.py)
+        if: steps.collect.outputs.count != '0'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: logos-co/logos-modules-release-tool
+          ref: v1
+          path: _tool
+
+      - id: merge
+        name: Add external packages to index.json
+        if: steps.collect.outputs.count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 _tool/index.py add index.json --from-file urls.txt
+          jq '{ schemaVersion, repositoryName, packageCount: (.packages | length) }' index.json
+          # `add` always bumps generatedAt, so compare with it stripped —
+          # otherwise every scheduled run would re-upload an identical
+          # index and churn the `index` release.
+          if diff -q <(jq -S 'del(.generatedAt)' index.json.orig) \
+                     <(jq -S 'del(.generatedAt)' index.json) >/dev/null; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::index already carries every external package — nothing to upload"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Replace the `index` release asset
+        if: steps.merge.outputs.changed == 'true'
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: index
+          # Same name/body the upstream rebuild uses, so the two writers
+          # don't flip-flop the release metadata between runs.
+          name:     Catalog index (auto-updated)
+          body:     "Auto-generated index of every per-module release in this repository."
+          files:    index.json

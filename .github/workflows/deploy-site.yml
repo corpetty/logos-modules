@@ -14,7 +14,11 @@ on:
       - "logos-repo.json"
       - "modules.txt"
   workflow_run:
-    workflows: ["Rebuild index"]
+    # "Augment index" runs after "Rebuild index" and adds the externally
+    # published modules (external-modules.txt). Listening to both means
+    # the page is regenerated once the index is final rather than in the
+    # window where the external entries are still missing.
+    workflows: ["Rebuild index", "Augment index"]
     types: [completed]
 
 permissions:
