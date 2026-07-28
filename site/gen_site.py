@@ -11,10 +11,12 @@ deploy-site workflow after every index rebuild; runnable locally too:
 Styling mirrors hackyguru.com — #121212 background, Inter body, mono
 headings with `//` markers, translucent white/5 cards with white/10 borders.
 """
-import argparse, base64, glob, html, json, os, shutil
+import argparse, base64, glob, html, json, os, re, shutil
 
 REPO_GH = "https://github.com/hackyguru/logos-modules"
 SOURCE_GH = "https://github.com/hackyguru/logos-workshop"
+
+_GH_RELEASE = re.compile(r"^(https://github\.com/[^/]+/[^/]+)/releases/download/", re.I)
 
 
 def prettify(name: str) -> str:
@@ -51,6 +53,20 @@ def find_icon(icon_name: str):
         mime = "image/svg+xml" if p.endswith(".svg") else "image/png"
         return f"data:{mime};base64," + base64.b64encode(b).decode()
     return None
+
+
+def source_link(vers: list) -> str:
+    """Repo to credit on a card.
+
+    Locally-built packages are released from the catalog repo itself and
+    their source lives in the workshop monorepo, so they get SOURCE_GH.
+    Externally published packages (external-modules.txt) are released
+    from the repo that HOLDS their source — link that one instead."""
+    for v in vers:
+        m = _GH_RELEASE.match(v.get("url", "") or "")
+        if m and m.group(1).rstrip("/").lower() != REPO_GH.lower():
+            return m.group(1)
+    return SOURCE_GH
 
 
 def group_apps(packages: list) -> list:
@@ -123,7 +139,7 @@ def render_app(members: list) -> str:
       <div class="card-foot">
         <div class="plats">{plats_html}</div>
         <div class="actions">
-          <a class="src mono" href="{SOURCE_GH}" target="_blank" rel="noopener">source ↗</a>
+          <a class="src mono" href="{source_link(vers)}" target="_blank" rel="noopener">source ↗</a>
           {dl_html}
         </div>
       </div>
