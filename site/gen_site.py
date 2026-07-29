@@ -18,6 +18,17 @@ SOURCE_GH = "https://github.com/hackyguru/logos-workshop"
 
 _GH_RELEASE = re.compile(r"^(https://github\.com/[^/]+/[^/]+)/releases/download/", re.I)
 
+# "Basecamp Tutorials" playlist, in playlist order. Edit this list to add or
+# reorder episodes — the modal's sidebar and player are generated from it, and
+# the "Part N" labels come from the position here, not from the video titles.
+PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLKLihqaY2Vc0"
+TUTORIALS = [
+    ("Logos Basecamp: Quickstart", "EwCkegIm_1o"),
+    ("Installing Logos Basecamp", "SZ72xolkZz4"),
+    ("Understanding .lgx modules on Logos Basecamp", "yZ_93uAAY9A"),
+    ("Building your first hello-world UI module on Logos Basecamp", "RPIWZ1RnYfA"),
+]
+
 
 def prettify(name: str) -> str:
     return " ".join(w.capitalize() for w in name.replace("_ui", "").split("_"))
@@ -67,6 +78,22 @@ def source_link(vers: list) -> str:
         if m and m.group(1).rstrip("/").lower() != REPO_GH.lower():
             return m.group(1)
     return SOURCE_GH
+
+
+def render_tutorials() -> str:
+    """Sidebar entries for the tutorial modal — one button per episode.
+
+    The first is marked current so the modal has a selection before any
+    click; the player's iframe src is set by JS on open, not here, so no
+    YouTube request happens until the user actually asks for one."""
+    return "\n".join(
+        f'        <button type="button" class="tut-item{" current" if i == 1 else ""}" '
+        f'data-id="{html.escape(vid)}" data-n="{i}" '
+        f'aria-current="{"true" if i == 1 else "false"}">'
+        f'<span class="tut-n mono">Part {i}</span>'
+        f'<span class="tut-t">{html.escape(name)}</span></button>'
+        for i, (name, vid) in enumerate(TUTORIALS, 1)
+    )
 
 
 def group_apps(packages: list) -> list:
@@ -163,6 +190,7 @@ def main():
     cards = "\n".join(render_app(m) for m in apps) if apps else (
         '<p class="empty mono">no modules published yet — check back soon.</p>'
     )
+    tut_items = render_tutorials()
     repo_url = f"{repo['homepage']}/logos-repo.json"
     generated = html.escape(index.get("generatedAt", ""))
 
@@ -325,9 +353,89 @@ def main():
     white-space: nowrap; transition: background .15s ease;
   }}
   a.btn:hover {{ background: #fff; color: #121212; }}
+  /* Screenshot column: "Watch Tutorials" above the shot, with a blurred,
+     slowly drifting copy of the shot glowing behind it. The glow is a
+     decorative duplicate — the screenshot itself stays sharp and legible. */
+  .add .shotwrap {{
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    width: 320px; max-width: 100%; flex-shrink: 0; margin: 0;
+  }}
+  .add .watch {{
+    display: inline-flex; align-items: center; gap: 8px; align-self: stretch;
+    justify-content: center; background: var(--fg); color: #121212; border: 0;
+    border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit; transition: background .15s ease, transform .15s ease;
+  }}
+  .add .watch:hover {{ background: #fff; transform: translateY(-1px); }}
+  .add .watch-play {{
+    width: 0; height: 0; border-style: solid; border-width: 5px 0 5px 8px;
+    border-color: transparent transparent transparent #121212;
+  }}
+  .add .shotframe {{ position: relative; display: block; width: 100%; }}
+  .add .shotglow {{
+    position: absolute; inset: 6% 2%; z-index: 0; border-radius: 24px;
+    background: url("basecamp.png") center/cover no-repeat;
+    filter: blur(26px) saturate(1.6); opacity: .5; will-change: transform, opacity;
+    animation: shotdrift 9s ease-in-out infinite alternate;
+  }}
+  @keyframes shotdrift {{
+    from {{ transform: scale(1.01) translateY(0);    opacity: .38; }}
+    to   {{ transform: scale(1.13) translateY(-6px); opacity: .72; }}
+  }}
   .add .shot {{
-    display: block; width: 320px; max-width: 100%; flex-shrink: 0;
+    position: relative; z-index: 1; display: block; width: 100%; max-width: 100%;
     border: 1px solid var(--border); border-radius: 8px;
+  }}
+
+  /* Tutorial modal */
+  .modal[hidden] {{ display: none; }}
+  .modal {{ position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 20px; }}
+  .modal-backdrop {{ position: absolute; inset: 0; background: rgba(0,0,0,.72); backdrop-filter: blur(6px); }}
+  .modal-box {{
+    position: relative; z-index: 1; width: min(1040px, 100%); max-height: 88vh;
+    display: flex; flex-direction: column; overflow: hidden;
+    background: #161616; border: 1px solid var(--border-hover); border-radius: 14px;
+    animation: modalin .18s ease-out;
+  }}
+  @keyframes modalin {{ from {{ opacity: 0; transform: translateY(8px) scale(.99); }} to {{ opacity: 1; transform: none; }} }}
+  .modal-head {{
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+  }}
+  .modal-head h3 {{ font-size: 14px; font-weight: 600; }}
+  .modal-head .sub {{ color: var(--dim); font-size: 12px; }}
+  .modal-x {{
+    background: transparent; color: var(--dim); border: 1px solid var(--border);
+    border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-size: 13px;
+    font-family: inherit; flex-shrink: 0; transition: color .15s ease, border-color .15s ease;
+  }}
+  .modal-x:hover {{ color: var(--fg); border-color: var(--border-hover); }}
+  .modal-body {{ display: flex; min-height: 0; flex: 1; }}
+  .tut-list {{
+    width: 288px; flex-shrink: 0; overflow-y: auto; padding: 10px;
+    border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px;
+  }}
+  .tut-item {{
+    display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%;
+    background: transparent; border: 1px solid transparent; border-radius: 9px;
+    padding: 10px 12px; cursor: pointer; font-family: inherit; color: var(--dim);
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }}
+  .tut-item:hover {{ background: var(--card-hover); color: var(--fg); }}
+  .tut-item.current {{ background: var(--card-hover); border-color: var(--border-hover); color: var(--fg); }}
+  .tut-n {{ font-size: 11px; letter-spacing: .04em; color: var(--dim); text-transform: uppercase; }}
+  .tut-item.current .tut-n {{ color: var(--fg); }}
+  .tut-t {{ font-size: 13px; line-height: 1.35; }}
+  .tut-player {{ flex: 1; min-width: 0; background: #000; display: flex; align-items: center; }}
+  .tut-player iframe {{ width: 100%; aspect-ratio: 16 / 9; border: 0; display: block; }}
+  @media (max-width: 760px) {{
+    .modal-body {{ flex-direction: column; overflow-y: auto; }}
+    .tut-list {{ width: 100%; border-right: 0; border-bottom: 1px solid var(--border); max-height: 40vh; }}
+  }}
+  @media (prefers-reduced-motion: reduce) {{
+    .add .shotglow {{ animation: none; opacity: .45; }}
+    .modal-box {{ animation: none; }}
+    .add .watch:hover {{ transform: none; }}
   }}
   .add .urlrow {{
     display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -427,7 +535,15 @@ def main():
           package manager in a single install for macOS and Linux.</p>
           <a class="btn" href="https://logos.co/basecamp" target="_blank" rel="noopener">download ↗</a>
         </div>
-        <img class="shot" src="basecamp.png" alt="Logos Basecamp running the Logos Wallet module" loading="lazy">
+        <figure class="shotwrap">
+          <button type="button" class="watch" id="watch-btn" aria-haspopup="dialog" aria-controls="tut-modal">
+            <span class="watch-play" aria-hidden="true"></span>Watch Tutorials
+          </button>
+          <span class="shotframe">
+            <span class="shotglow" aria-hidden="true"></span>
+            <img class="shot" src="basecamp.png" alt="Logos Basecamp running the Logos Wallet module" loading="lazy">
+          </span>
+        </figure>
       </div>
       <div class="urlrow">
         <code id="repo-url">{html.escape(repo_url)}</code>
@@ -448,6 +564,30 @@ def main():
     <a href="{repo['homepage']}/logos-repo.json">logos-repo.json</a>
   </footer>
 </main>
+
+<div class="modal" id="tut-modal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="tut-heading">
+    <div class="modal-head">
+      <div>
+        <h3 id="tut-heading">Basecamp Tutorials</h3>
+        <span class="sub mono">{len(TUTORIALS)} episodes · <a href="{PLAYLIST_URL}" target="_blank" rel="noopener">watch on youtube ↗</a></span>
+      </div>
+      <button class="modal-x" data-close aria-label="Close tutorials">✕</button>
+    </div>
+    <div class="modal-body">
+      <nav class="tut-list" aria-label="Tutorial episodes">
+{tut_items}
+      </nav>
+      <div class="tut-player">
+        <iframe id="tut-frame" title="Basecamp tutorial video" allowfullscreen
+                allow="accelerometer; encrypted-media; picture-in-picture; web-share"
+                referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   // Scramble-on-hover for the title, mirroring hackyguru.com's heading.
   (function () {{
@@ -494,6 +634,55 @@ def main():
     }}
     btn.addEventListener("click", function () {{ setOpen(!menu.classList.contains("open")); }});
     menu.addEventListener("click", function (e) {{ if (e.target.tagName === "A") setOpen(false); }});
+  }})();
+
+  // Tutorial modal. The iframe carries no src until the modal opens, so the
+  // page makes no YouTube request unless the visitor asks for one — and the
+  // src is cleared on close, which is what actually stops playback.
+  (function () {{
+    var modal = document.getElementById("tut-modal");
+    var frame = document.getElementById("tut-frame");
+    var open  = document.getElementById("watch-btn");
+    var items = [].slice.call(modal.querySelectorAll(".tut-item"));
+    if (!modal || !frame || !open || !items.length) return;
+
+    function embed(id, autoplay) {{
+      return "https://www.youtube-nocookie.com/embed/" + id +
+             "?rel=0&modestbranding=1&playsinline=1" + (autoplay ? "&autoplay=1" : "");
+    }}
+
+    function select(item, autoplay) {{
+      items.forEach(function (b) {{
+        var on = b === item;
+        b.classList.toggle("current", on);
+        b.setAttribute("aria-current", on ? "true" : "false");
+      }});
+      frame.src = embed(item.dataset.id, autoplay);
+      frame.title = "Part " + item.dataset.n + " — " + item.querySelector(".tut-t").textContent;
+    }}
+
+    function setOpen(isOpen) {{
+      modal.hidden = !isOpen;
+      document.body.style.overflow = isOpen ? "hidden" : "";
+      if (isOpen) {{
+        select(modal.querySelector(".tut-item.current") || items[0], false);
+        modal.querySelector(".modal-x").focus();
+      }} else {{
+        frame.removeAttribute("src");   // stops playback
+        open.focus();
+      }}
+    }}
+
+    open.addEventListener("click", function () {{ setOpen(true); }});
+    items.forEach(function (b) {{
+      b.addEventListener("click", function () {{ select(b, true); }});
+    }});
+    modal.addEventListener("click", function (e) {{
+      if (e.target.hasAttribute("data-close")) setOpen(false);
+    }});
+    document.addEventListener("keydown", function (e) {{
+      if (e.key === "Escape" && !modal.hidden) setOpen(false);
+    }});
   }})();
 </script>
 </body>
