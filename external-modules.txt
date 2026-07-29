@@ -35,3 +35,5 @@ hackyguru/lotion
 hackyguru/logos-hello-world
 hackyguru/logos-todo
 hackyguru/logos-shared-color
+hackyguru/logos-polling
+hackyguru/logos-filesharing
