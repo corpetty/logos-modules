@@ -33,3 +33,4 @@ hackyguru/lotion
 # Workshop series — each part split out of hackyguru/logos-workshop into
 # its own repo, publishing its own signed .lgx. Same key throughout.
 hackyguru/logos-hello-world
+hackyguru/logos-todo
