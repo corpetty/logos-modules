@@ -529,7 +529,7 @@ def main():
 <div class="topbar" id="topbar">
   <nav>
     <a class="avatar" href="https://hackyguru.com" aria-label="Guru">
-      <img src="head.gif" alt="Guru">
+      <img src="head.gif" alt="Guru" width="40" height="40" decoding="async">
     </a>
     <div class="links">
       <a href="https://hackyguru.com/#about">about</a>
