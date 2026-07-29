@@ -360,16 +360,30 @@ def main():
     display: flex; flex-direction: column; align-items: center; gap: 12px;
     width: 320px; max-width: 100%; flex-shrink: 0; margin: 0;
   }}
+  /* Glass button floating over the screenshot. backdrop-filter blurs the
+     pixels behind it, so it reads as sitting on the image rather than
+     punched into it; the shadow keeps it legible over light UI regions. */
   .add .watch {{
-    display: inline-flex; align-items: center; gap: 8px; align-self: stretch;
-    justify-content: center; background: var(--fg); color: #121212; border: 0;
-    border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600;
-    cursor: pointer; font-family: inherit; transition: background .15s ease, transform .15s ease;
+    position: absolute; z-index: 2; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+    background: rgba(22,22,22,.42); color: #fff;
+    border: 1px solid rgba(255,255,255,.38); border-radius: 999px;
+    padding: 10px 20px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    backdrop-filter: blur(9px) saturate(1.3);
+    -webkit-backdrop-filter: blur(9px) saturate(1.3);
+    box-shadow: 0 6px 22px rgba(0,0,0,.45);
+    transition: background .15s ease, border-color .15s ease, transform .15s ease;
   }}
-  .add .watch:hover {{ background: #fff; transform: translateY(-1px); }}
+  .add .watch:hover {{
+    background: rgba(38,38,38,.58); border-color: rgba(255,255,255,.7);
+    transform: translate(-50%, -50%) scale(1.04);
+  }}
+  .add .watch:focus-visible {{ outline: 2px solid #fff; outline-offset: 3px; }}
   .add .watch-play {{
     width: 0; height: 0; border-style: solid; border-width: 5px 0 5px 8px;
-    border-color: transparent transparent transparent #121212;
+    border-color: transparent transparent transparent #fff;
   }}
   .add .shotframe {{ position: relative; display: block; width: 100%; }}
   .add .shotglow {{
@@ -391,8 +405,10 @@ def main():
   .modal[hidden] {{ display: none; }}
   .modal {{ position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 20px; }}
   .modal-backdrop {{ position: absolute; inset: 0; background: rgba(0,0,0,.72); backdrop-filter: blur(6px); }}
+  .modal {{ padding: 2vh 2vw; }}
   .modal-box {{
-    position: relative; z-index: 1; width: min(1040px, 100%); max-height: 88vh;
+    position: relative; z-index: 1;
+    width: min(1720px, 96vw); height: min(96vh, 1020px);
     display: flex; flex-direction: column; overflow: hidden;
     background: #161616; border: 1px solid var(--border-hover); border-radius: 14px;
     animation: modalin .18s ease-out;
@@ -412,8 +428,8 @@ def main():
   .modal-x:hover {{ color: var(--fg); border-color: var(--border-hover); }}
   .modal-body {{ display: flex; min-height: 0; flex: 1; }}
   .tut-list {{
-    width: 288px; flex-shrink: 0; overflow-y: auto; padding: 10px;
-    border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px;
+    width: 340px; flex-shrink: 0; overflow-y: auto; padding: 12px;
+    border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 5px;
   }}
   .tut-item {{
     display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%;
@@ -426,11 +442,19 @@ def main():
   .tut-n {{ font-size: 11px; letter-spacing: .04em; color: var(--dim); text-transform: uppercase; }}
   .tut-item.current .tut-n {{ color: var(--fg); }}
   .tut-t {{ font-size: 13px; line-height: 1.35; }}
-  .tut-player {{ flex: 1; min-width: 0; background: #000; display: flex; align-items: center; }}
-  .tut-player iframe {{ width: 100%; aspect-ratio: 16 / 9; border: 0; display: block; }}
+  /* The player fills whatever space the (fixed-height) box leaves, instead of
+     being capped by a 16:9 box — that's what makes the modal feel large.
+     YouTube letterboxes inside it, which is invisible against the black. */
+  .tut-player {{ flex: 1; min-width: 0; min-height: 0; background: #000; }}
+  .tut-player iframe {{ width: 100%; height: 100%; border: 0; display: block; }}
   @media (max-width: 760px) {{
+    .modal {{ padding: 0; }}
+    .modal-box {{ width: 100vw; height: 100vh; border: 0; border-radius: 0; }}
     .modal-body {{ flex-direction: column; overflow-y: auto; }}
-    .tut-list {{ width: 100%; border-right: 0; border-bottom: 1px solid var(--border); max-height: 40vh; }}
+    .tut-list {{ width: 100%; border-right: 0; border-bottom: 1px solid var(--border); max-height: none; }}
+    /* Stacked layout has no fixed height to fill, so restore the aspect box. */
+    .tut-player {{ flex: none; }}
+    .tut-player iframe {{ height: auto; aspect-ratio: 16 / 9; }}
   }}
   @media (prefers-reduced-motion: reduce) {{
     .add .shotglow {{ animation: none; opacity: .45; }}
@@ -536,12 +560,12 @@ def main():
           <a class="btn" href="https://logos.co/basecamp" target="_blank" rel="noopener">download ↗</a>
         </div>
         <figure class="shotwrap">
-          <button type="button" class="watch" id="watch-btn" aria-haspopup="dialog" aria-controls="tut-modal">
-            <span class="watch-play" aria-hidden="true"></span>Watch Tutorials
-          </button>
           <span class="shotframe">
             <span class="shotglow" aria-hidden="true"></span>
             <img class="shot" src="basecamp.png" alt="Logos Basecamp running the Logos Wallet module" loading="lazy">
+            <button type="button" class="watch" id="watch-btn" aria-haspopup="dialog" aria-controls="tut-modal">
+              <span class="watch-play" aria-hidden="true"></span>Watch Tutorials
+            </button>
           </span>
         </figure>
       </div>
