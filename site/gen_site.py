@@ -197,7 +197,12 @@ def main():
     site_url = repo["homepage"]
     title = repo.get("displayName", "Guru's Logos Modules")
     description = repo["description"]
-    og_image = f"{site_url}/basecamp.png"
+    # Same social card as hackyguru.com. The original is served from a
+    # token-signed opengraph.b-cdn.net URL, so it's vendored as site/og.png
+    # rather than hotlinked — the token would eventually stop resolving and
+    # every shared link would lose its preview. favicon.ico is already the
+    # same file as hackyguru.com's (identical sha256).
+    og_image = f"{site_url}/og.png"
     site_ld = json.dumps({
         "@context": "https://schema.org",
         "@type": "WebSite",
@@ -232,8 +237,8 @@ def main():
 <meta property="og:description" content="{html.escape(description)}">
 <meta property="og:url" content="{site_url}">
 <meta property="og:image" content="{og_image}">
-<meta property="og:image:width" content="1600">
-<meta property="og:image:height" content="1054">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
 <meta property="og:locale" content="en_US">
 
 <!-- Twitter -->
@@ -717,7 +722,7 @@ def main():
         f.write(page)
     # static assets served next to index.html (too big to inline)
     here = os.path.dirname(os.path.abspath(__file__))
-    for asset in ("head.gif", "basecamp.png", "favicon.ico"):
+    for asset in ("head.gif", "basecamp.png", "favicon.ico", "og.png"):
         src = os.path.join(here, asset)
         if os.path.exists(src):
             shutil.copy(src, args.out)
