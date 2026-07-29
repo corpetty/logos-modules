@@ -197,11 +197,10 @@ def main():
     site_url = repo["homepage"]
     title = repo.get("displayName", "Guru's Logos Modules")
     description = repo["description"]
-    # Same social card as hackyguru.com. The original is served from a
-    # token-signed opengraph.b-cdn.net URL, so it's vendored as site/og.png
-    # rather than hotlinked — the token would eventually stop resolving and
-    # every shared link would lose its preview. favicon.ico is already the
-    # same file as hackyguru.com's (identical sha256).
+    # Social card for this site specifically, in the same theme as the page
+    # (site/og.png). 1200x630 is the 1.91:1 ratio X and Facebook crop toward,
+    # so nothing important gets clipped. favicon.ico is already the same file
+    # as hackyguru.com's (identical sha256).
     og_image = f"{site_url}/og.png"
     site_ld = json.dumps({
         "@context": "https://schema.org",
@@ -238,7 +237,10 @@ def main():
 <meta property="og:url" content="{site_url}">
 <meta property="og:image" content="{og_image}">
 <meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="675">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="{html.escape(title)}">
+<meta name="twitter:image:alt" content="{html.escape(title)}">
 <meta property="og:locale" content="en_US">
 
 <!-- Twitter -->
