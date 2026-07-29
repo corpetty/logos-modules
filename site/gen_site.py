@@ -11,7 +11,10 @@ deploy-site workflow after every index rebuild; runnable locally too:
 Styling mirrors hackyguru.com — #121212 background, Inter body, mono
 headings with `//` markers, translucent white/5 cards with white/10 borders.
 """
-import argparse, base64, glob, html, json, os, re, shutil
+import argparse, base64, glob, hashlib, html, json, os, re, shutil
+
+# Directory holding this script and the static assets it publishes.
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 REPO_GH = "https://github.com/hackyguru/logos-modules"
 SOURCE_GH = "https://github.com/hackyguru/logos-workshop"
@@ -201,7 +204,16 @@ def main():
     # (site/og.png). 1200x630 is the 1.91:1 ratio X and Facebook crop toward,
     # so nothing important gets clipped. favicon.ico is already the same file
     # as hackyguru.com's (identical sha256).
-    og_image = f"{site_url}/og.png"
+    #
+    # Published under a content-hashed name. X (and Facebook, LinkedIn, …)
+    # cache the IMAGE by its URL on their own CDNs, separately from the page
+    # scrape — so replacing og.png in place leaves them serving the previous
+    # card even after they re-read the page. A hashed filename means a new
+    # card is always a new URL, which they have no choice but to fetch.
+    # og.png stays published too, for anyone linking it directly.
+    og_hash = hashlib.sha256(open(os.path.join(HERE, "og.png"), "rb").read()).hexdigest()[:10]
+    og_name = f"og.{og_hash}.png"
+    og_image = f"{site_url}/{og_name}"
     site_ld = json.dumps({
         "@context": "https://schema.org",
         "@type": "WebSite",
@@ -728,6 +740,9 @@ def main():
         src = os.path.join(here, asset)
         if os.path.exists(src):
             shutil.copy(src, args.out)
+    # Same bytes as og.png, published under the hashed name the meta tags
+    # point at — see the og_image comment above for why.
+    shutil.copy(os.path.join(here, "og.png"), os.path.join(args.out, og_name))
     print(f"wrote {args.out}/index.html — {len(apps)} app(s), {len(index.get('packages', []))} package(s)")
 
 
