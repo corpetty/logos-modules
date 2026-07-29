@@ -34,3 +34,4 @@ hackyguru/lotion
 # its own repo, publishing its own signed .lgx. Same key throughout.
 hackyguru/logos-hello-world
 hackyguru/logos-todo
+hackyguru/logos-shared-color
