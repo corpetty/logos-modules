@@ -480,9 +480,15 @@ def main():
     .modal-box {{ animation: none; }}
     .add .watch:hover {{ transform: none; }}
   }}
+  /* The section divider sits above the label, so the label reads as a
+     heading for the URL row rather than floating between the two. */
+  .add .urllabel {{
+    margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);
+    color: var(--fg); font-size: 13.5px; font-weight: 600;
+  }}
   .add .urlrow {{
     display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-    margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);
+    margin-top: 10px;
   }}
   .add code {{
     font-size: 13px; color: var(--fg); background: rgba(0,0,0,.35);
@@ -588,6 +594,7 @@ def main():
           </span>
         </figure>
       </div>
+      <p class="urllabel">Add this catalog to your package manager</p>
       <div class="urlrow">
         <code id="repo-url">{html.escape(repo_url)}</code>
         <button onclick="navigator.clipboard.writeText(document.getElementById('repo-url').textContent).then(()=>{{this.textContent='copied';setTimeout(()=>this.textContent='copy',1500)}})">copy</button>
