@@ -587,7 +587,7 @@ def main():
         <figure class="shotwrap">
           <span class="shotframe">
             <span class="shotglow" aria-hidden="true"></span>
-            <img class="shot" src="basecamp.png" alt="Logos Basecamp running the Logos Wallet module" loading="lazy">
+            <img class="shot" src="basecamp.png" alt="Logos Basecamp running the Persona module" loading="lazy">
             <button type="button" class="watch" id="watch-btn" aria-haspopup="dialog" aria-controls="tut-modal">
               <span class="watch-play" aria-hidden="true"></span>Watch Tutorials
             </button>
