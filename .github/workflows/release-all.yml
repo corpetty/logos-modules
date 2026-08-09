@@ -46,12 +46,34 @@ jobs:
             echo "No submodules declared in .gitmodules — nothing to release."
             exit 0
           fi
-          matrix="$(printf '%s\n' ${paths} | jq -R . | jq -cs '{module_path: .}')"
-          count="$(printf '%s\n' ${paths} | wc -l | tr -d ' ')"
+          # Expand each submodule into module paths. A submodule with a root
+          # metadata.json is a single module; a monorepo submodule (no root
+          # metadata, e.g. persona → core/ + ui/) contributes each immediate
+          # subdir that carries a metadata.json.
+          modpaths=""
+          for p in ${paths}; do
+            git submodule update --init -- "$p" >/dev/null 2>&1 || true
+            if [ -f "$p/metadata.json" ]; then
+              modpaths="${modpaths} ${p}"
+            else
+              for d in "$p"/*/; do
+                [ -f "${d}metadata.json" ] && modpaths="${modpaths} ${d%/}"
+              done
+            fi
+          done
+          modpaths="$(printf '%s\n' ${modpaths} | sed '/^$/d' | sort -u)"
+          if [ -z "${modpaths}" ]; then
+            echo 'matrix={"module_path":[]}' >> "$GITHUB_OUTPUT"
+            echo 'count=0' >> "$GITHUB_OUTPUT"
+            echo "No modules found in any submodule."
+            exit 0
+          fi
+          matrix="$(printf '%s\n' ${modpaths} | jq -R . | jq -cs '{module_path: .}')"
+          count="$(printf '%s\n' ${modpaths} | wc -l | tr -d ' ')"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
           echo "count=${count}"  >> "$GITHUB_OUTPUT"
           echo "Discovered ${count} module(s):"
-          printf '  %s\n' ${paths}
+          printf '  %s\n' ${modpaths}
 
   release:
     needs: discover

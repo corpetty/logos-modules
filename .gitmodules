@@ -16,9 +16,6 @@
 ; After cloning a fork, materialise the submodule working trees with:
 ;
 ;   git submodule update --init --recursive
-[submodule "submodules/logos-wallet-core"]
-	path = submodules/logos-wallet-core
-	url = https://github.com/hackyguru/logos-wallet-core
-[submodule "submodules/logos-wallet-ui"]
-	path = submodules/logos-wallet-ui
-	url = https://github.com/hackyguru/logos-wallet-ui
+[submodule "submodules/persona"]
+	path = submodules/persona
+	url = https://github.com/hackyguru/persona
