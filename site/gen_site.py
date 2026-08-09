@@ -33,8 +33,18 @@ TUTORIALS = [
 ]
 
 
+def app_base(name: str) -> str:
+    """The app a module belongs to: its name minus a `_ui` or `_core` suffix.
+    Pairs both `<x>`+`<x>_ui` (e.g. filesharing) and `<x>_core`+`<x>` (Persona:
+    persona_core + persona)."""
+    for suf in ("_ui", "_core"):
+        if name.endswith(suf):
+            return name[: -len(suf)]
+    return name
+
+
 def prettify(name: str) -> str:
-    return " ".join(w.capitalize() for w in name.replace("_ui", "").split("_"))
+    return " ".join(w.capitalize() for w in app_base(name).split("_"))
 
 
 def latest(pkg: dict) -> dict:
@@ -100,24 +110,17 @@ def render_tutorials() -> str:
 
 
 def group_apps(packages: list) -> list:
-    """Merge `<x>` + `<x>_ui` into one app card; standalone packages get their own."""
-    by_name = {p["name"]: p for p in packages}
-    apps, used = [], set()
-    for name, pkg in by_name.items():
-        if name in used or name.endswith("_ui"):
-            continue
-        members = [pkg]
-        used.add(name)
-        ui = by_name.get(name + "_ui")
-        if ui:
-            members.append(ui)
-            used.add(ui["name"])
-        apps.append(members)
-    for name, pkg in by_name.items():  # ui packages with no core sibling
-        if name not in used:
-            apps.append([pkg])
-            used.add(name)
-    return apps
+    """Merge a core module and its UI into one app card. Groups by app base
+    name (see `app_base`), so both `<x>`+`<x>_ui` and `<x>_core`+`<x>` pair up;
+    a lone module gets its own card. First-appearance order is preserved."""
+    groups, order = {}, []
+    for pkg in packages:
+        base = app_base(pkg["name"])
+        if base not in groups:
+            groups[base] = []
+            order.append(base)
+        groups[base].append(pkg)
+    return [groups[base] for base in order]
 
 
 def render_app(members: list) -> str:
