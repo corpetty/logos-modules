@@ -53,7 +53,10 @@ permissions:
 
 jobs:
   release:
-    uses: logos-co/logos-modules-release-action/.github/workflows/release.yml@v1
+    # v1.3, not the `v1` major tag: `v1` lags behind and lacks the
+    # submodule-prefix resolution a subdirectory module_path needs
+    # (submodules/muster/module). Pinned by SHA so the tag can't move.
+    uses: logos-co/logos-modules-release-action/.github/workflows/release.yml@974960591a8dd275c84618b7c946b4db616c0cd2
     with:
       module_path: ${{ inputs.module_path }}
 
