@@ -1,8 +1,8 @@
 ; Module submodule set for this catalog.
 ;
-; This file starts empty. Add each module you want to publish as a git
-; submodule under `submodules/`. The easiest way is the helper script,
-; which also generates the matching per-module release workflow:
+; Every module this catalog publishes is a git submodule under
+; `submodules/`. To add one, use the helper script, which also generates
+; the matching per-module release workflow:
 ;
 ;   ./scripts/add-module.sh https://github.com/<owner>/<repo>
 ;
@@ -16,6 +16,21 @@
 ; After cloning a fork, materialise the submodule working trees with:
 ;
 ;   git submodule update --init --recursive
-[submodule "submodules/persona"]
-	path = submodules/persona
-	url = https://github.com/hackyguru/persona
+[submodule "submodules/logos-workflow-registry"]
+	path = submodules/logos-workflow-registry
+	url = https://github.com/corpetty/logos-workflow-registry
+[submodule "submodules/logos-workflow-engine"]
+	path = submodules/logos-workflow-engine
+	url = https://github.com/corpetty/logos-workflow-engine
+[submodule "submodules/logos-workflow-scheduler"]
+	path = submodules/logos-workflow-scheduler
+	url = https://github.com/corpetty/logos-workflow-scheduler
+[submodule "submodules/logos-workflow-canvas"]
+	path = submodules/logos-workflow-canvas
+	url = https://github.com/corpetty/logos-workflow-canvas
+[submodule "submodules/logos_mcp"]
+	path = submodules/logos_mcp
+	url = https://github.com/corpetty/logos_mcp
+[submodule "submodules/muster"]
+	path = submodules/muster
+	url = https://github.com/corpetty/muster

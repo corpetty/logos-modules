@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "name": "hackyguru-modules",
-  "displayName": "Guru's Logos Modules",
-  "description": "Logos Basecamp modules by Guru (hackyguru) — Persona (private LEZ wallet + Bedrock base-chain node), with more on the way.",
-  "homepage": "https://modules.hackyguru.com",
-  "indexUrl": "https://github.com/hackyguru/logos-modules/releases/download/index/index.json",
+  "name": "corpetty-modules",
+  "displayName": "Corey's Logos Modules",
+  "description": "Logos Basecamp modules by Corey Petty (corpetty) — a visual workflow stack (registry, engine, scheduler, canvas), an MCP bridge, and Muster.",
+  "homepage": "https://modules.bayesianpersuasion.com",
+  "indexUrl": "https://github.com/corpetty/logos-modules/releases/download/index/index.json",
   "trustedSigners": [
     {
-      "did": "did:jwk:eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6InJnS29VWGJpOHh5WV9rT0ZyblFHamt6VzRRNGFLYUlnWmE0bXZpNFJvSzAifQ",
-      "name": "hackyguru"
+      "did": "did:jwk:eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6InBaMGlqU3VRM1RYc3RYUGRkRmk3NkphR3Vucnc0MmFhM1lMVG9yQkVjSVkifQ",
+      "name": "corpetty"
     }
   ]
 }

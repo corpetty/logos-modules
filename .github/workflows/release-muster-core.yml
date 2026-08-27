@@ -1,9 +1,9 @@
-name: Release persona-core
+name: Release muster-core
 
-# Manually-triggered release for the persona_core module, which lives in the
-# persona monorepo submodule at submodules/persona/core. Delegates to the
-# shared _release-module.yml (signing config lives there). The forked
-# release-action resolves the containing submodule from this subdir path.
+# Manually-triggered release for the muster_module core module, which lives
+# in the muster monorepo submodule at submodules/muster/module. Delegates to
+# the shared _release-module.yml (signing config lives there). The release
+# action resolves the containing submodule from this subdir path.
 
 on:
   workflow_dispatch:
@@ -20,6 +20,6 @@ jobs:
   release:
     uses: ./.github/workflows/_release-module.yml
     with:
-      module_path: submodules/persona/core
+      module_path: submodules/muster/module
       force_build: ${{ inputs.force_build }}
     secrets: inherit

@@ -53,7 +53,7 @@ permissions:
 
 jobs:
   release:
-    uses: hackyguru/logos-modules-release-action/.github/workflows/release.yml@688189ce2b888b3c79bd1aa98ab53f9175f1e4f4
+    uses: logos-co/logos-modules-release-action/.github/workflows/release.yml@v1
     with:
       module_path: ${{ inputs.module_path }}
 

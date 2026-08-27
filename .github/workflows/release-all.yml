@@ -48,7 +48,7 @@ jobs:
           fi
           # Expand each submodule into module paths. A submodule with a root
           # metadata.json is a single module; a monorepo submodule (no root
-          # metadata, e.g. persona → core/ + ui/) contributes each immediate
+          # metadata, e.g. muster → module/) contributes each immediate
           # subdir that carries a metadata.json.
           modpaths=""
           for p in ${paths}; do

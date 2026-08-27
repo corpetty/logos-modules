@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate modules.hackyguru.com — static catalog page for this repo.
+"""Generate modules.bayesianpersuasion.com — static catalog page for this repo.
 
 Reads the catalog's index.json (as published in the `index` release) and
 logos-repo.json, and emits a single self-contained index.html. Run by the
@@ -8,16 +8,21 @@ deploy-site workflow after every index rebuild; runnable locally too:
     curl -fsSL $(python3 -c "import json;print(json.load(open('logos-repo.json'))['indexUrl'])") -o /tmp/index.json
     python3 site/gen_site.py --index /tmp/index.json --out _site
 
-Styling mirrors hackyguru.com — #121212 background, Inter body, mono
-headings with `//` markers, translucent white/5 cards with white/10 borders.
+Dark theme — #121212 background, Inter body, mono headings with `//`
+markers, translucent white/5 cards with white/10 borders. The mark in the
+title bar and on the social card is bayesianpersuasion.com's own icon.
 """
 import argparse, base64, glob, hashlib, html, json, os, re, shutil
 
 # Directory holding this script and the static assets it publishes.
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-REPO_GH = "https://github.com/hackyguru/logos-modules"
-SOURCE_GH = "https://github.com/hackyguru/logos-workshop"
+REPO_GH = "https://github.com/corpetty/logos-modules"
+
+# bayesianpersuasion.com's own nav, so the catalog reads as part of the site.
+SITE = "https://bayesianpersuasion.com"
+NAV = [("about", f"{SITE}/about"), ("posts", f"{SITE}/posts"),
+       ("notes", f"{SITE}/notes"), ("contact", f"{SITE}/contact")]
 
 _GH_RELEASE = re.compile(r"^(https://github\.com/[^/]+/[^/]+)/releases/download/", re.I)
 
@@ -34,17 +39,23 @@ TUTORIALS = [
 
 
 def app_base(name: str) -> str:
-    """The app a module belongs to: its name minus a `_ui` or `_core` suffix.
-    Pairs both `<x>`+`<x>_ui` (e.g. filesharing) and `<x>_core`+`<x>` (Persona:
-    persona_core + persona)."""
-    for suf in ("_ui", "_core"):
+    """The app a module belongs to: its name minus a role suffix, so a core
+    module and its UI land on one card — `<x>`+`<x>_ui`, `<x>_core`+`<x>`, and
+    `<x>_module`+`<x>_ui` (Muster) all pair up. A module with no role suffix
+    (the workflow modules, logos_mcp) is its own app."""
+    for suf in ("_ui", "_core", "_module"):
         if name.endswith(suf):
             return name[: -len(suf)]
     return name
 
 
+# Words a plain .capitalize() gets wrong.
+ACRONYMS = {"mcp": "MCP", "dag": "DAG", "api": "API"}
+
+
 def prettify(name: str) -> str:
-    return " ".join(w.capitalize() for w in app_base(name).split("_"))
+    return " ".join(ACRONYMS.get(w, w.capitalize())
+                    for w in app_base(name).split("_") if w)
 
 
 def latest(pkg: dict) -> dict:
@@ -79,18 +90,60 @@ def find_icon(icon_name: str):
     return None
 
 
-def source_link(vers: list) -> str:
+def submodule_sources() -> dict:
+    """Map module name → the GitHub repo whose submodule supplies it.
+
+    Locally-built packages are released from the catalog repo, so their
+    release URL points here and says nothing about where the source
+    lives. Read that off the submodules instead: every `path=`/`url=`
+    pair in .gitmodules, keyed by the `name` in the metadata.json at that
+    path — or in an immediate subdir, for a repo whose modules sit in
+    subdirectories (e.g. muster → module/)."""
+    src = {}
+    try:
+        entries = open(".gitmodules").read()
+    except OSError:
+        return src
+    path = None
+    for line in entries.splitlines():
+        line = line.strip()
+        if line.startswith(("#", ";")):
+            continue
+        if line.startswith("path"):
+            path = line.split("=", 1)[1].strip()
+        elif line.startswith("url") and path:
+            url = line.split("=", 1)[1].strip().removesuffix(".git")
+            for meta in [f"{path}/metadata.json"] + sorted(glob.glob(f"{path}/*/metadata.json")):
+                try:
+                    src[json.load(open(meta))["name"]] = url
+                except (OSError, json.JSONDecodeError, KeyError):
+                    continue
+            path = None
+    return src
+
+
+_SUBMODULE_SRC = None
+
+
+def source_link(vers: list, names: list) -> str:
     """Repo to credit on a card.
 
-    Locally-built packages are released from the catalog repo itself and
-    their source lives in the workshop monorepo, so they get SOURCE_GH.
     Externally published packages (external-modules.txt) are released
-    from the repo that HOLDS their source — link that one instead."""
+    from the repo that HOLDS their source — link that one. Locally-built
+    ones are released from this catalog, so look their source repo up in
+    .gitmodules; fall back to the catalog if that lookup comes up dry
+    (e.g. the site is generated without the submodules checked out)."""
+    global _SUBMODULE_SRC
     for v in vers:
         m = _GH_RELEASE.match(v.get("url", "") or "")
         if m and m.group(1).rstrip("/").lower() != REPO_GH.lower():
             return m.group(1)
-    return SOURCE_GH
+    if _SUBMODULE_SRC is None:
+        _SUBMODULE_SRC = submodule_sources()
+    for n in names:
+        if n in _SUBMODULE_SRC:
+            return _SUBMODULE_SRC[n]
+    return REPO_GH
 
 
 def render_tutorials() -> str:
@@ -172,7 +225,7 @@ def render_app(members: list) -> str:
       <div class="card-foot">
         <div class="plats">{plats_html}</div>
         <div class="actions">
-          <a class="src mono" href="{source_link(vers)}" target="_blank" rel="noopener">source ↗</a>
+          <a class="src mono" href="{source_link(vers, [m["name"] for m in manifests])}" target="_blank" rel="noopener">source ↗</a>
           {dl_html}
         </div>
       </div>
@@ -197,16 +250,18 @@ def main():
         '<p class="empty mono">no modules published yet — check back soon.</p>'
     )
     tut_items = render_tutorials()
+    nav_links = "\n      ".join(
+        f'<a href="{html.escape(url)}">{html.escape(label)}</a>' for label, url in NAV)
     repo_url = f"{repo['homepage']}/logos-repo.json"
     generated = html.escape(index.get("generatedAt", ""))
 
     site_url = repo["homepage"]
-    title = repo.get("displayName", "Guru's Logos Modules")
+    title = repo.get("displayName", "Corey's Logos Modules")
     description = repo["description"]
     # Social card for this site specifically, in the same theme as the page
     # (site/og.png). 1200x630 is the 1.91:1 ratio X and Facebook crop toward,
-    # so nothing important gets clipped. favicon.ico is already the same file
-    # as hackyguru.com's (identical sha256).
+    # so nothing important gets clipped. favicon.ico and avatar.png are
+    # bayesianpersuasion.com's mark, so the tab and title bar match the site.
     #
     # Published under a content-hashed name. X (and Facebook, LinkedIn, …)
     # cache the IMAGE by its URL on their own CDNs, separately from the page
@@ -225,9 +280,8 @@ def main():
         "description": description,
         "author": {
             "@type": "Person",
-            "name": "Kumaraguru",
-            "alternateName": "Guru",
-            "url": "https://hackyguru.com",
+            "name": "Corey Petty",
+            "url": SITE,
         },
     })
 
@@ -238,7 +292,7 @@ def main():
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)}</title>
 <meta name="description" content="{html.escape(description)}">
-<meta name="author" content="Kumaraguru">
+<meta name="author" content="Corey Petty">
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#121212">
 <link rel="icon" href="favicon.ico" sizes="any">
@@ -260,9 +314,9 @@ def main():
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:site" content="@hackyguru">
-<meta name="twitter:creator" content="@hackyguru">
-<meta property="twitter:domain" content="modules.hackyguru.com">
+<meta name="twitter:site" content="@corpetty">
+<meta name="twitter:creator" content="@corpetty">
+<meta property="twitter:domain" content="modules.bayesianpersuasion.com">
 <meta property="twitter:url" content="{site_url}">
 <meta name="twitter:title" content="{html.escape(title)}">
 <meta name="twitter:description" content="{html.escape(description)}">
@@ -294,7 +348,7 @@ def main():
   ::selection {{ background: rgba(255,255,255,.2); }}
   main {{ max-width: 880px; margin: 0 auto; padding: 112px 24px 96px; }}
 
-  /* title bar — same as hackyguru.com's navbar */
+  /* title bar — same shape as bayesianpersuasion.com's navbar */
   .topbar {{
     position: fixed; top: 0; left: 0; width: 100%; z-index: 50;
     border-bottom: 1px solid transparent;
@@ -310,7 +364,11 @@ def main():
     height: 64px; padding: 0 16px;
   }}
   @media (min-width: 768px) {{ .topbar nav {{ padding: 0 32px; }} }}
-  .topbar .avatar img {{ width: 40px; height: 40px; display: block; object-fit: cover; }}
+  .topbar .avatar img {{
+    width: 40px; height: 40px; display: block; border-radius: 999px;
+    opacity: .9; transition: opacity .2s;
+  }}
+  .topbar .avatar:hover img {{ opacity: 1; }}
   .topbar .links {{
     display: none; align-items: center; gap: 32px;
     border: 1px solid var(--border); border-radius: 999px;
@@ -350,7 +408,7 @@ def main():
     margin: 10px 0 16px; cursor: default;
   }}
 
-  /* section heading — `// label`, as on hackyguru.com */
+  /* section heading — `// label` */
   h2 {{
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 16px; font-weight: 600; color: var(--fg); margin-bottom: 16px;
@@ -551,14 +609,11 @@ def main():
 <body>
 <div class="topbar" id="topbar">
   <nav>
-    <a class="avatar" href="https://hackyguru.com" aria-label="Guru">
-      <img src="head.gif" alt="Guru" width="40" height="40" decoding="async">
+    <a class="avatar" href="{SITE}" aria-label="Bayesian Persuasion">
+      <img src="avatar.png" alt="Bayesian Persuasion" width="40" height="40" decoding="async">
     </a>
     <div class="links">
-      <a href="https://hackyguru.com/#about">about</a>
-      <a href="https://hackyguru.com/articles">articles</a>
-      <a href="https://hackyguru.com/talks">talks</a>
-      <a href="https://hackyguru.com/awards">awards</a>
+      {nav_links}
     </div>
     <button class="menu-btn" id="menu-btn" aria-label="Toggle menu">
       <svg id="icon-open" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
@@ -567,14 +622,11 @@ def main():
   </nav>
 </div>
 <div class="mobile-menu" id="mobile-menu">
-  <a href="https://hackyguru.com/#about">about</a>
-  <a href="https://hackyguru.com/articles">articles</a>
-  <a href="https://hackyguru.com/talks">talks</a>
-  <a href="https://hackyguru.com/awards">awards</a>
+  {nav_links}
 </div>
 <main>
   <header>
-    <h1 id="title">guru's logos modules</h1>
+    <h1 id="title">{html.escape(title.lower())}</h1>
   </header>
 
   <section>
@@ -590,7 +642,7 @@ def main():
         <figure class="shotwrap">
           <span class="shotframe">
             <span class="shotglow" aria-hidden="true"></span>
-            <img class="shot" src="basecamp.png" alt="Logos Basecamp running the Persona module" loading="lazy">
+            <img class="shot" src="basecamp.png" alt="Logos Basecamp" loading="lazy">
             <button type="button" class="watch" id="watch-btn" aria-haspopup="dialog" aria-controls="tut-modal">
               <span class="watch-play" aria-hidden="true"></span>Watch Tutorials
             </button>
@@ -642,7 +694,7 @@ def main():
 </div>
 
 <script>
-  // Scramble-on-hover for the title, mirroring hackyguru.com's heading.
+  // Scramble-on-hover for the title.
   (function () {{
     var el = document.getElementById("title");
     var text = el.textContent, timer = null;
@@ -665,7 +717,7 @@ def main():
     scramble();
   }})();
 
-  // Title bar: blur + border once scrolled, as on hackyguru.com.
+  // Title bar: blur + border once scrolled.
   (function () {{
     var bar = document.getElementById("topbar");
     function onScroll() {{ bar.classList.toggle("scrolled", window.scrollY > 20); }}
@@ -746,7 +798,7 @@ def main():
         f.write(page)
     # static assets served next to index.html (too big to inline)
     here = os.path.dirname(os.path.abspath(__file__))
-    for asset in ("head.gif", "basecamp.png", "favicon.ico", "og.png"):
+    for asset in ("avatar.png", "basecamp.png", "favicon.ico", "og.png"):
         src = os.path.join(here, asset)
         if os.path.exists(src):
             shutil.copy(src, args.out)

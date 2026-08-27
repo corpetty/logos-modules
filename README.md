@@ -1,15 +1,15 @@
-# Guru's Logos Modules
+# Corey's Logos Modules
 
 Personal [Logos Basecamp](https://logos.co) module catalog by
-[@hackyguru](https://github.com/hackyguru) — browse it at
-**[modules.hackyguru.com](https://modules.hackyguru.com)**.
+[@corpetty](https://github.com/corpetty) — browse it at
+**[modules.bayesianpersuasion.com](https://modules.bayesianpersuasion.com)**.
 
 ## Install in Basecamp
 
 Basecamp → **Package Manager → Add repository**:
 
 ```
-https://modules.hackyguru.com/logos-repo.json
+https://modules.bayesianpersuasion.com/logos-repo.json
 ```
 
 Then install any module below with one click — Basecamp resolves
@@ -17,17 +17,21 @@ versions and dependencies for you.
 
 ## Modules
 
-| Module | Packages | Description |
-| ------ | -------- | ----------- |
-| **Logos Wallet** | `logos_wallet` (core), `logos_wallet_ui` | Unified Bedrock (base chain) + LEZ (execution zone) wallet — node lifecycle, base transfers/inscriptions, and private LEZ payments. |
-| **Lotion** | `lotion` (core), `lotion_ui` | Local-first, Notion-style writing workspace — SQLite pages with AES-256-GCM envelope crypto, optionally published to logos-storage. |
+| Module | Package | Source | Description |
+| ------ | ------- | ------ | ----------- |
+| **Workflow Registry** | `workflow_registry` | [logos-workflow-registry](https://github.com/corpetty/logos-workflow-registry) | Discovers loaded Logos modules and turns their method signatures into workflow node types. |
+| **Workflow Engine** | `workflow_engine` | [logos-workflow-engine](https://github.com/corpetty/logos-workflow-engine) | DAG-based execution engine — control flow, transforms, error recovery. Needs `workflow_registry`. |
+| **Workflow Scheduler** | `workflow_scheduler` | [logos-workflow-scheduler](https://github.com/corpetty/logos-workflow-scheduler) | Deployment, cron/interval scheduling, webhook triggers, execution history. Needs `workflow_engine`. |
+| **Workflow Canvas** | `workflow_canvas` (QML) | [logos-workflow-canvas](https://github.com/corpetty/logos-workflow-canvas) | Visual editor — drag, drop and wire module operations into pipelines. Needs `workflow_registry` + `workflow_engine`. |
+| **Logos MCP** | `logos_mcp` | [logos_mcp](https://github.com/corpetty/logos_mcp) | Logos-to-MCP bridge: exposes Logos module methods as MCP tools for AI tooling. |
+| **Muster** | `muster_module` (core), `muster_ui` | [muster](https://github.com/corpetty/muster) | Local-first client for coordinating multi-party transactions inside conversations. |
 
-`lotion_ui` additionally depends on `storage_module`, which this catalog
-does not publish — add a repository that carries it (or install it
-first) or Basecamp's dependency resolution will fail.
+The four workflow modules install as a set: registry → engine →
+scheduler, with canvas as the UI on top.
 
-More coming as they're polished — source lives in
-[hackyguru/logos-workshop](https://github.com/hackyguru/logos-workshop).
+Muster depends on `delivery_module`, which this catalog does not
+publish — add a repository that carries it (or install it first) or
+Basecamp's dependency resolution will fail.
 
 ## How it works
 
@@ -36,27 +40,58 @@ GitHub Actions build each module's `.lgx` from its Nix flake
 (`.#lgx-portable`), sign it (Ed25519 — the public DID is in
 [`logos-repo.json`](logos-repo.json) under `trustedSigners`), publish it
 as a `<module>-v<version>` release, and roll everything into the
-[`index` release](https://github.com/hackyguru/logos-modules/releases/tag/index)
+[`index` release](https://github.com/corpetty/logos-modules/releases/tag/index)
 that clients read.
+
+Each module is a git submodule under [`submodules/`](submodules); its
+`metadata.json` is the source of truth for name and version. Add one
+with [`scripts/add-module.sh`](scripts/add-module.sh), which registers
+the submodule and generates the matching `Release <module>` workflow.
+The pipeline builds one module per `metadata.json` directory, so a repo
+holding several works too — `muster` is wired that way
+(`submodules/muster/module` and `submodules/muster/ui`, released by
+[`release-muster-core.yml`](.github/workflows/release-muster-core.yml)
+and [`release-muster-ui.yml`](.github/workflows/release-muster-ui.yml)).
+`release-all.yml` discovers those subdirectories on its own.
 
 ### Externally published modules
 
-The release pipeline builds one module per **submodule root** — it reads
-`<module_path>/metadata.json` and can't target a subdirectory. A monorepo
-holding several modules therefore publishes its own signed `.lgx` (with
-the same key, so `trustedSigners` still matches), and this catalog folds
-those release assets into the index by URL. The sources are listed in
-[`external-modules.txt`](external-modules.txt); the **Augment index**
-workflow runs after every **Rebuild index** and adds them on top.
-[hackyguru/lotion](https://github.com/hackyguru/lotion) works this way —
-`lotion-core` and `lotion-ui` live side by side in one repo.
+A module released from a repo whose build this catalog can't run has to
+publish its own signed `.lgx` (with the same key, so `trustedSigners`
+still matches); the catalog then folds those release assets into the
+index by URL. Sources go in
+[`external-modules.txt`](external-modules.txt), and the **Augment index**
+workflow runs after every **Rebuild index** to add them on top. That file
+is currently empty — everything here is built in this repo.
 
-Development happens in the
-[logos-workshop](https://github.com/hackyguru/logos-workshop) monorepo;
-each module is mirrored to its own repo (`logos-wallet-core`,
-`logos-wallet-ui`) via `scripts/sync-wallet-modules.sh` over there, and
-those mirrors are the submodules released here.
-Releases are cut from the Actions tab (**Release …**) or with
-[`scripts/catalog.sh`](scripts/catalog.sh). The site at
-modules.hackyguru.com is regenerated by CI from the index after every
-release.
+### Releasing
+
+Cut a release from the Actions tab (**Release …**) or with
+[`scripts/catalog.sh`](scripts/catalog.sh):
+
+```bash
+./scripts/catalog.sh release logos-workflow-registry --watch
+./scripts/catalog.sh release-all --watch
+./scripts/catalog.sh rebuild-index
+```
+
+A new release happens when you bump a submodule pointer (and thereby its
+`metadata.json#version`) and re-run its workflow. The site at
+modules.bayesianpersuasion.com is regenerated by CI from the index after
+every release.
+
+### Signing
+
+Releases are signed inline in CI with the `LOGOS_SIGNING_KEY` Actions
+secret (an Ed25519 JWK); the matching public DID is the one listed in
+`logos-repo.json`. The mode is configured in one place —
+[`_release-module.yml`](.github/workflows/_release-module.yml) — for both
+the per-module and the umbrella workflows.
+
+### Working copy
+
+After cloning, materialise the submodules:
+
+```bash
+git submodule update --init --recursive
+```

@@ -1,6 +1,6 @@
 name: Deploy site
 
-# Regenerates and publishes modules.hackyguru.com (GitHub Pages) from the
+# Regenerates and publishes modules.bayesianpersuasion.com (GitHub Pages) from the
 # catalog's index.json. Runs after every "Rebuild index" so the page always
 # reflects what clients can actually install, and on pushes that touch the
 # site or catalog metadata.
@@ -12,7 +12,7 @@ on:
     paths:
       - "site/**"
       - "logos-repo.json"
-      - "modules.txt"
+      - "external-modules.txt"
   workflow_run:
     # "Augment index" runs after "Rebuild index" and adds the externally
     # published modules (external-modules.txt). Listening to both means

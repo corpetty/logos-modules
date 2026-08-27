@@ -1,15 +1,18 @@
 # Externally-published modules folded into this catalog's index.json.
 #
-# Most modules in this catalog are built HERE: they are git submodules
+# Every module in this catalog is built HERE: they are git submodules
 # under submodules/, and the "Release <module>" workflows build, sign and
-# publish their .lgx into this repo's own releases.
+# publish their .lgx into this repo's own releases. This file is empty
+# because nothing needs the escape hatch yet.
 #
-# Some can't be. The release pipeline builds one module per submodule
-# ROOT (it reads <module_path>/metadata.json and cannot target a
-# subdirectory), so a monorepo holding several modules has to publish its
-# own signed .lgx. This file lists those sources; the "Augment index"
-# workflow folds their release assets into index.json after every
-# "Rebuild index", so clients see them alongside the locally-built ones.
+# Use it when a module can't be built here. The release pipeline builds
+# one module per metadata.json directory, so a repo whose modules live in
+# subdirectories is fine (see submodules/muster/module) — but a module
+# released from somewhere you don't control, or one that needs a build
+# this catalog can't run, has to publish its own signed .lgx. This file
+# lists those sources; the "Augment index" workflow folds their release
+# assets into index.json after every "Rebuild index", so clients see them
+# alongside the locally-built ones.
 #
 # Format — one entry per line, blank lines and `#` comments ignored:
 #
@@ -25,15 +28,3 @@
 # key whose DID is listed under `trustedSigners` in logos-repo.json.
 # Adding a source here whose signer you don't control means vouching for
 # that key — don't.
-
-# Lotion — monorepo publishing `lotion` (core) + `lotion_ui` (QML),
-# signed with the same key as this catalog.
-hackyguru/lotion
-
-# Workshop series — each part split out of hackyguru/logos-workshop into
-# its own repo, publishing its own signed .lgx. Same key throughout.
-hackyguru/logos-hello-world
-hackyguru/logos-todo
-hackyguru/logos-shared-color
-hackyguru/logos-polling
-hackyguru/logos-filesharing
