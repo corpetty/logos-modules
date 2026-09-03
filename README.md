@@ -19,10 +19,10 @@ versions and dependencies for you.
 
 | Module | Package | Source | Description |
 | ------ | ------- | ------ | ----------- |
-| **Workflow Registry** | `workflow_registry` | [logos-workflow-registry](https://github.com/corpetty/logos-workflow-registry) | Discovers loaded Logos modules and turns their method signatures into workflow node types. |
+| **Workflow Registry** | `workflow_registry` | [logos-workflow-registry](https://github.com/corpetty/logos-workflow-registry) | Discovers installed Logos modules and turns their method signatures into workflow node types. |
 | **Workflow Engine** | `workflow_engine` | [logos-workflow-engine](https://github.com/corpetty/logos-workflow-engine) | DAG-based execution engine — control flow, transforms, error recovery. Needs `workflow_registry`. |
 | **Workflow Scheduler** | `workflow_scheduler` | [logos-workflow-scheduler](https://github.com/corpetty/logos-workflow-scheduler) | Deployment, cron/interval scheduling, webhook triggers, execution history. Needs `workflow_engine`. |
-| **Workflow Canvas** | `workflow_canvas` (QML) | [logos-workflow-canvas](https://github.com/corpetty/logos-workflow-canvas) | Visual editor — drag, drop and wire module operations into pipelines. Needs `workflow_registry` + `workflow_engine`. |
+| **Workflow Canvas** | `workflow_canvas` | [logos-workflow-canvas](https://github.com/corpetty/logos-workflow-canvas) | Visual editor — drag, drop and wire module operations into pipelines. Needs `workflow_registry` + `workflow_engine` + `workflow_scheduler`. |
 | **Logos MCP** | `logos_mcp` | [logos_mcp](https://github.com/corpetty/logos_mcp) | Logos-to-MCP bridge: exposes Logos module methods as MCP tools for AI tooling. |
 | **Muster** | `muster_module` (core), `muster_ui` | [muster](https://github.com/corpetty/muster) | Local-first client for coordinating multi-party transactions inside conversations. |
 
