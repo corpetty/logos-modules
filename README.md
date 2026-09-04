@@ -27,7 +27,9 @@ versions and dependencies for you.
 | **Muster** | `muster_module` (core), `muster_ui` | [muster](https://github.com/corpetty/muster) | Local-first client for coordinating multi-party transactions inside conversations. |
 
 The four workflow modules install as a set: registry → engine →
-scheduler, with canvas as the UI on top.
+scheduler, with canvas as the UI on top. To build and test all four inside a
+local basecamp checkout, see
+[`docs/basecamp-workflow-suite-runbook.md`](docs/basecamp-workflow-suite-runbook.md).
 
 Muster depends on `delivery_module`, which this catalog does not
 publish — add a repository that carries it (or install it first) or
