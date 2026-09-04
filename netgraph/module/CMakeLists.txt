@@ -15,17 +15,29 @@ endif()
 # to produce the bound `ConnectionSource` wrapper + `bind_connection_source`
 # factory.
 #
-# SKELETON source list. The M0 collector adds the platform-split socket table:
-#     src/collector.h
-#     src/linux_socket_table.cpp   # /proc/net + /proc/<pid>/fd
-#     src/macos_socket_table.cpp   # libproc
-#     src/fake_socket_table.cpp    # tests / doctest fixture
-#     src/socket_table_factory.cpp # makeSocketTable() platform pick
-# gated by CMAKE_SYSTEM_NAME so each host compiles only its own impl.
+# The platform socket tables and pid sources are self-guarded (#if __linux__ /
+# __APPLE__), so all are listed here and each compiles to nothing off its host.
 logos_module(
     NAME netgraph
     SOURCES
         src/netgraph_impl.h
         src/netgraph_impl.cpp
         src/collector.h
+        src/process_source.h
+        src/proc_net_parse.h
+        src/proc_net_parse.cpp
+        src/merge.h
+        src/merge.cpp
+        src/sweep.h
+        src/sweep.cpp
+        src/socket_table_factory.cpp
+        src/fake_sources.cpp
+        src/linux_socket_table.cpp
+        src/linux_process_source.cpp
+        src/macos_socket_table.cpp
+        src/macos_process_source.cpp
 )
+
+# The sweep runs on a std::thread; link the platform threads library.
+find_package(Threads REQUIRED)
+target_link_libraries(netgraph_module_plugin PRIVATE Threads::Threads)

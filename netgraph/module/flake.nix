@@ -27,8 +27,9 @@
       configFile = ./metadata.json;
       flakeInputs = inputs;
 
-      # M1+ adds pure unit tests for the classifier and the merge layer, driven
-      # by the fake socket table:
-      #   tests = { dir = ./tests; };
+      # Pure unit tests for the parse + merge + sweep layer live under tests/ and
+      # run without the SDK via tests/run_local.sh (see tests/README.md). Wiring
+      # them as a flake check (tests = { dir = ./tests; }) waits on confirming the
+      # builder's test-harness contract — the local runner is the proof today.
     };
 }

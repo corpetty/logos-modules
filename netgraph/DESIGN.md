@@ -141,10 +141,95 @@ Build once extracted: `nix build .#lgx`; install with
 `lgpm install --file` or Basecamp's Package Manager. Develop against a second
 instance: `LogosBasecamp --user-dir /tmp/basecamp-ng`.
 
-## Next step (M0)
+## Process-tree attribution — a handoff assumption that does not hold
 
-Implement `collector.h` — the Linux `/proc` and macOS libproc socket tables and
-the fake — wire `sweepOnce()` over it, take the pid list from liblogos process
-stats, and prove it with a `logoscore` doctest: open a known connection, see it
-appear in `snapshot()`. No UI. That milestone alone answers the original
-question.
+Reading the SDK/core to wire M0 turned up a blocker. The handoff says the pid
+list "comes from the per-module process stats liblogos already reports
+(`logoscore stats` — name, pid, cpu, memory)". That table is real, but it is a
+**host-only** API: `logos_core_get_module_stats()` in liblogos, reached through
+`logos::host::LogosCore` (`logos_host_core.h`), constructed once in a host's
+`main()`. It is **not reachable from a universal Basecamp module**:
+
+- `LogosModuleContext::modules()` exposes only the typed wrappers for the
+  module's own declared dependencies — no pid list, no process table.
+- Basecamp reads the stats in `CoreModuleManager` (a 2 s timer) and surfaces
+  them to QML; it never re-exports them to modules.
+- The `logoscore-cli` daemon *does* register a `core_service` module with a
+  `getModuleStats()` method — but it only exists under that daemon, is gated by
+  a CLI token, and is absent under Basecamp.
+
+So the pid problem splits in two, and the split is now in the code:
+
+1. **Existence — which pids to sweep.** Solved module-side, no host help, by
+   process **ancestry**: the descendants of the Logos host process
+   (`process_source.h` → `linux_process_source.cpp` / `macos_process_source.cpp`,
+   walking `/proc/<pid>/stat` ppid or libproc `pbsi_ppid`). This is name-independent,
+   so it honours the handoff's one prohibition ("do not discover the tree by
+   matching process names"). Collector A runs fully on this — the existence
+   graph, DNS and HTTPS included, works with zero host cooperation. **This is
+   M0's headline and it is built and tested.**
+
+2. **Name attribution — pid → module name.** Needs the host stats, and so does
+   Collector B (to place a provider's rows by its pid). Left behind a resolver
+   that fills `ProcInfo.name` / `MergeContext.pidNames`; absent it, every row
+   still carries a real pid and `module: null` — shown, per "the unlabelled rows
+   are the point". Three ways to supply it, **a decision for you** because it
+   sets the module's dependency shape:
+
+   - **(a) core_service under the logoscore-cli daemon.** Zero new code upstream;
+     `core_service.getModuleStats()` gives name+pid. But it is daemon-only — it
+     does **not** attribute anything under Basecamp, where the module ships. Good
+     enough to make the **M0 doctest** show real names (the doctest runs under
+     `logoscore`), not a production answer.
+   - **(b) a small stats-exporting core module**, declared as a netgraph
+     dependency, that wraps `logos_core_get_module_stats()` and exposes it over
+     an inter-module call. Works under both hosts and stays within the
+     interface-dependency model. Costs one new upstream module.
+   - **(c) host-fed.** Basecamp passes the stats into the module (e.g. via config
+     on the user switch, refreshed). No new module, but couples to Basecamp and
+     needs a host change.
+
+   Recommendation: **(a) for the M0 doctest now** (it needs nothing new and
+   proves attribution end-to-end where the doctest runs), and **(b) as the
+   production path** for Basecamp (smallest change that attributes under the real
+   host and fits the interface-dependency model). (c) only if a host change is
+   already on the table.
+
+## M0 status
+
+Built and unit-tested (pure, no SDK — `tests/run_local.sh`, all green), and the
+Linux collector verified against this host's live `/proc`:
+
+- `proc_net_parse.{h,cpp}` — `/proc/net/{tcp,tcp6,udp,udp6}` decode (v4/v6
+  endianness, state map, direction inference). Tested.
+- `merge.{h,cpp}` — the A/B merge, pid→name attribution, derived edges, host
+  tagging, stable id. Tested.
+- `sweep.{h,cpp}` — the pure pipeline `buildSnapshot()` (discover → enumerate →
+  merge → document). Tested over the fakes.
+- `collector.h` + `linux_socket_table.cpp` — Collector A on Linux, `/proc/net`
+  parse + inode→pid via `/proc/<pid>/fd`. Verified live.
+- `process_source.h` + `linux_process_source.cpp` — ancestry pid discovery.
+  Verified live.
+- `socket_table_factory.cpp` + `fake_sources.cpp` — platform pick + fakes.
+- `netgraph_impl.{h,cpp}` — the `setEnabled`/`snapshot`/`getInfo` surface and the
+  timer thread driving `buildSnapshot`. Compiles against the SDK (not buildable
+  in the dev sandbox); logic factored into the tested pure functions.
+- `macos_socket_table.cpp` / `macos_process_source.cpp` — libproc impls, written
+  from the documented API, **unverified on this host** (Linux sandbox); verify on
+  Apple Silicon.
+
+Deferred:
+
+- **Collector B** provider bind + the pid→name resolver — both wait on the
+  attribution decision above (marked TODO in `netgraph_impl.cpp`).
+- **M0 doctest** under `logoscore` — open a known connection, see it in
+  `snapshot()` (mirrors openmetrics' `doctests/`). Wants the attribution path
+  chosen so the doctest can assert real module names via (a).
+- openmetrics cross-check (you scoped it in early) — reads openmetrics'
+  aggregated counters, compares reported peers vs sockets per pid, surfaces the
+  gap. An optional declared dependency; lands with Collector B.
+
+## Next step
+
+Decide the attribution path (a/b/c), then wire Collector B + the resolver and
+write the M0 doctest. macOS verification on an Apple Silicon box in parallel.

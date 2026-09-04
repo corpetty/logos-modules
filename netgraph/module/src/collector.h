@@ -15,9 +15,10 @@
 // netstat — a portable .lgx cannot depend on host binaries. No privileges are
 // needed for our own process tree on either platform.
 //
-// This header is declarations only. The bodies are the M0 collector and are
-// deliberately NOT written yet: the handoff's first step is to propose this
-// skeleton and the connection_source header before writing the collector.
+// The Linux impl + fake are written and tested (the macOS impl is written but
+// unverified off-device). Pid *discovery* is a separate seam (process_source.h);
+// enumerate() takes an explicit pid set so this collector stays independent of
+// how the process tree is found.
 
 #include <cstdint>
 #include <memory>
